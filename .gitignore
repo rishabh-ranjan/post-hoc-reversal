@@ -1,0 +1,6 @@
+_pycache__
+.ipynb_checkpoints
+/wandb
+/data
+/runs
+/enss
