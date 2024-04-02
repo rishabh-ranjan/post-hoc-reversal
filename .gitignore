@@ -1,6 +1,6 @@
-_pycache__
+__pycache__
 .ipynb_checkpoints
 *.egg-info
 wandb
-/data
-/out
+data
+out

@@ -33,7 +33,7 @@ def main(args):
     if args.wandb:
         wandb.init(
             project=args.wandb,
-            name=f"{args.base}+ens__{args.root[-3:]}",
+            name=f"{args.base}+ens__{args.root[-4:]}",
             config=args,
         )
 

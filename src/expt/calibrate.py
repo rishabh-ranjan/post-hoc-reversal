@@ -24,7 +24,7 @@ def main(args):
     if args.wandb:
         wandb.init(
             project=args.wandb,
-            name=f"{args.base}+{args.suf}__{args.root[-3:]}",
+            name=f"{args.base}+{args.suf}__{args.root[-4:]}",
             config=args,
         )
 

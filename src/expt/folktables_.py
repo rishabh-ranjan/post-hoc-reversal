@@ -242,7 +242,6 @@ if __name__ == "__main__":
     import time
 
     root = f"runs/dev/{time.time_ns()}"  ###
-    Path(root).mkdir(parents=True)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, default=root)  ###
