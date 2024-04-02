@@ -1,6 +1,6 @@
 _pycache__
 .ipynb_checkpoints
-/wandb
+*.egg-info
+wandb
 /data
-/runs
-/enss
+/out
