@@ -8,7 +8,7 @@ We recommend using [mamba](https://github.com/mamba-org/mamba), a fast implement
 
 Create a new environment:
 ```bash
-mamba env create -f env.yml
+mamba env create -f env_exact.yml
 mamba activate post-hoc-reversal
 ```
 
