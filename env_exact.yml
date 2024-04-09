@@ -377,6 +377,8 @@ dependencies:
       - ogb==1.3.6
       - outdated==0.2.2
       - pytorch-minimize==0.0.2
-      - timm==0.8.20.dev0
-      - torchcal==1.0.0
+      # - timm==0.8.20.dev0
+      - git+https://github.com/rishabh-ranjan/pytorch-image-models@a40ac8fbe16fc0b702a6a7b98f4ad0f0abe9bccb
+      # - torchcal==1.0.0
+      - git+https://github.com/rishabh-ranjan/torchcal@v1.0.0
       - wilds==2.0.0
