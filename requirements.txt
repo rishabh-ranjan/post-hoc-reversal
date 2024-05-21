@@ -1,0 +1,19 @@
+matplotlib
+wandb
+torch
+torchvision
+transformers
+datasets
+accelerate
+sentencepiece!=0.1.92
+scipy
+scikit-learn
+protobuf
+evaluate
+torch_geometric
+pandas=1.5.3  # bug in wilds for pandas 2.0.0
+torchcal @ git+https://github.com/rishabh-ranjan/torchcal
+pytorch-image-models @ git+https://github.com/rishabh-ranjan/pytorch-image-models
+folktables
+wilds
+
