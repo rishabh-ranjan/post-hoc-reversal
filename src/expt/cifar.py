@@ -27,7 +27,7 @@ def all_y_from_cifar_n(dataset):
     url = f"https://github.com/UCSC-REAL/cifar-10-100n/raw/main/data/{name}_human.pt"
     print(f"downloading {name}-N labels from {url}")
     r = requests.get(url)
-    pt = torch.load(io.BytesIO(r.content), map_location="cpu")
+    pt = torch.load(io.BytesIO(r.content), weights_only=True, map_location="cpu")
 
     if dataset == "cifar10":
         map_ = {
@@ -73,14 +73,14 @@ def main(args):
         x = x_from_cifar(args.dataset)
         Path(x_path).parent.mkdir(exist_ok=True, parents=True)
         torch.save(x, x_path)
-    x = torch.load(x_path, map_location=device)
+    x = torch.load(x_path, weights_only=True, map_location=device)
 
     all_y_path = f"data/cifar_n/{args.dataset}_all_y.pt"
     if not Path(all_y_path).exists():
         all_y = all_y_from_cifar_n(args.dataset)
         Path(all_y_path).parent.mkdir(exist_ok=True, parents=True)
         torch.save(all_y, all_y_path)
-    all_y = torch.load(all_y_path, map_location=device)
+    all_y = torch.load(all_y_path, weights_only=True, map_location=device)
 
     y = all_y[args.noise]
 
@@ -141,7 +141,7 @@ def main(args):
     if args.scheduler == "cosine":
         lrs = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs)
 
-    scaler = torch.cuda.amp.GradScaler(enabled=args.amp)
+    scaler = torch.amp.GradScaler(enabled=args.amp)
 
     if args.loss == "sop":
         sop = utils.SOPLoss(X["train"].size(0), num_classes).to(device)

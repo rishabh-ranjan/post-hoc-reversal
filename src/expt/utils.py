@@ -1,12 +1,10 @@
 from collections import defaultdict
-import json
 from pathlib import Path
 
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
 from torch.optim.swa_utils import AveragedModel
-import torchcal
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -19,6 +17,7 @@ def evaluate(yhat, y):
     return {
         "err": (yhat.argmax(-1) != y).float().mean(),
         "nll": F.cross_entropy(yhat, y),
+        "mem": F.softmax(yhat, -1).gather(-1, y[None, :]).mean(),
     }
 
 
@@ -46,7 +45,9 @@ class KeyValStore:
         if cache and key in self.cache:
             return self.cache[key]
 
-        val = torch.load(f"{self.root}/{key}.pt", self.device)
+        val = torch.load(
+            f"{self.root}/{key}.pt", weights_only=True, map_location=self.device
+        )
 
         if cache:
             self.cache[key] = val
