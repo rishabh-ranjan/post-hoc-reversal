@@ -12,6 +12,8 @@ import torchvision.transforms as T
 from tqdm.auto import tqdm
 import wandb
 
+wandb.require("core")
+
 
 class FastDataLoader:
     def __init__(
@@ -70,7 +72,7 @@ def all_y_from_cifar_n(dataset):
     url = f"https://github.com/UCSC-REAL/cifar-10-100n/raw/main/data/{name}_human.pt"
     print(f"downloading {name}-N labels from {url}")
     r = requests.get(url)
-    pt = torch.load(io.BytesIO(r.content), map_location="cpu")
+    pt = torch.load(io.BytesIO(r.content), weights_only=True, map_location="cpu")
 
     if dataset == "cifar10":
         map_ = {
@@ -113,14 +115,14 @@ def main(args):
         x = x_from_cifar(args.dataset)
         Path(x_path).parent.mkdir(exist_ok=True, parents=True)
         torch.save(x, x_path)
-    x = torch.load(x_path, map_location=device)
+    x = torch.load(x_path, weights_only=True, map_location=device)
 
     all_y_path = f"data/cifar_n/{args.dataset}_all_y.pt"
     if not Path(all_y_path).exists():
         all_y = all_y_from_cifar_n(args.dataset)
         Path(all_y_path).parent.mkdir(exist_ok=True, parents=True)
         torch.save(all_y, all_y_path)
-    all_y = torch.load(all_y_path, map_location=device)
+    all_y = torch.load(all_y_path, weights_only=True, map_location=device)
 
     y = all_y[args.noise]
 
@@ -136,13 +138,6 @@ def main(args):
     elif args.dataset == "cifar100_fine":
         num_classes = 100
 
-    print(f"{num_classes=}")
-    print(f"{len(X['train'])=}")
-    print(f"{len(X['val'])=}")
-    print(f"{len(X['test'])=}")
-    print(f"max class freq: {y.bincount().max() / y.size(-1)}")
-    print(f"min class freq: {y.bincount().min() / y.size(-1)}")
-
     mean = IMAGENET_MEAN if args.pretrained else CIFAR_MEAN
     std = IMAGENET_STD if args.pretrained else CIFAR_STD
 
@@ -152,7 +147,7 @@ def main(args):
 
     eval_loaders = {
         split: FastDataLoader([X[split]], args.eval_batch_size, shuffle=False)
-        for split in ["val", "test"]
+        for split in ["train", "val", "test"]
     }
 
     train_loader = FastDataLoader(
@@ -234,6 +229,51 @@ def main(args):
                 )
 
         lrs.step()
+
+        yhat, y = pred(net, "train")
+        if args.wandb:
+            wandb.log(
+                {
+                    "err/train": (yhat.argmax(-1) != y).float().mean(),
+                    "nll/train": F.cross_entropy(yhat, y),
+                },
+                step,
+            )
+
+        y = all_y[args.noise][:40_000]
+        clean_msk = y == all_y["clean"][:40_000]
+        yhat_clean = yhat[clean_msk]
+        yhat_noisy = yhat[~clean_msk]
+        y_clean = y[clean_msk]
+        y_noisy = y[~clean_msk]
+
+        if args.wandb:
+            wandb.log(
+                {
+                    "err/train/clean": (yhat_clean.argmax(-1) != y_clean)
+                    .float()
+                    .mean(),
+                    "nll/train/clean": F.cross_entropy(yhat_clean, y_clean),
+                    "err/train/noisy": (yhat_noisy.argmax(-1) != y_noisy)
+                    .float()
+                    .mean(),
+                    "nll/train/noisy": F.cross_entropy(yhat_noisy, y_noisy),
+                },
+                step,
+            )
+
+        prob_clean = F.softmax(yhat_clean, -1).gather(-1, y_clean[None, :])[:, 0].mean()
+        prob_noisy = F.softmax(yhat_noisy, -1).gather(-1, y_noisy[None, :])[:, 0].mean()
+        prob = F.softmax(yhat, -1).gather(-1, y[None, :])[:, 0].mean()
+        if args.wandb:
+            wandb.log(
+                {
+                    "prob/train/clean": prob_clean,
+                    "prob/train/noisy": prob_noisy,
+                    "prob/train": prob,
+                },
+                step,
+            )
 
     if args.wandb:
         wandb.finish()
