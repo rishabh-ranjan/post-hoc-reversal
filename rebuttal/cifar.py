@@ -12,7 +12,50 @@ import torchvision.transforms as T
 from tqdm.auto import tqdm
 import wandb
 
-from . import utils
+
+class FastDataLoader:
+    def __init__(
+        self,
+        tensors,
+        batch_size,
+        shuffle=False,
+    ):
+        self.tensors = tensors
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+        self.len = self.tensors[0].size(0)
+        self.num_batches, self.rem = divmod(self.len, batch_size)
+        if self.rem > 0:
+            self.num_batches += 1
+
+    def __iter__(self):
+        if self.shuffle:
+            r = torch.randperm(self.len)
+            self.tensors = [t[r] for t in self.tensors]
+        self.cur_idx = 0
+        return self
+
+    def __next__(self):
+        if self.cur_idx == self.len:
+            raise StopIteration
+        if self.cur_idx == 0 and self.rem > 0:
+            end_idx = self.rem
+        else:
+            end_idx = self.cur_idx + self.batch_size
+        batch = [t[self.cur_idx : end_idx] for t in self.tensors]
+        self.cur_idx = end_idx
+        return batch
+
+    def __len__(self):
+        return self.num_batches
+
+
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+
+CIFAR_MEAN = [0.4914, 0.4822, 0.4465]
+CIFAR_STD = [0.2023, 0.1994, 0.2010]
 
 
 def x_from_cifar(dataset):
@@ -65,9 +108,6 @@ def main(args):
     else:
         device = torch.device("cpu")
 
-    kv = utils.KeyValStore(args.root, device)
-    kv.save(args, "args")
-
     x_path = f"data/cifar_n/{args.dataset}_x.pt"
     if not Path(x_path).exists():
         x = x_from_cifar(args.dataset)
@@ -103,19 +143,19 @@ def main(args):
     print(f"max class freq: {y.bincount().max() / y.size(-1)}")
     print(f"min class freq: {y.bincount().min() / y.size(-1)}")
 
-    mean = utils.IMAGENET_MEAN if args.pretrained else utils.CIFAR_MEAN
-    std = utils.IMAGENET_STD if args.pretrained else utils.CIFAR_STD
+    mean = IMAGENET_MEAN if args.pretrained else CIFAR_MEAN
+    std = IMAGENET_STD if args.pretrained else CIFAR_STD
 
     normalize = T.Normalize(mean, std)
     for split in ["train", "val", "test"]:
         X[split] = normalize(X[split])
 
     eval_loaders = {
-        split: utils.FastDataLoader([X[split]], args.eval_batch_size, shuffle=False)
+        split: FastDataLoader([X[split]], args.eval_batch_size, shuffle=False)
         for split in ["val", "test"]
     }
 
-    train_loader = utils.FastDataLoader(
+    train_loader = FastDataLoader(
         [torch.arange(X["train"].size(0), device=device), X["train"], Y["train"]],
         args.train_batch_size,
         shuffle=True,
@@ -141,21 +181,7 @@ def main(args):
     if args.scheduler == "cosine":
         lrs = optim.lr_scheduler.CosineAnnealingLR(opt, args.num_epochs)
 
-    scaler = torch.cuda.amp.GradScaler(enabled=args.amp)
-
-    if args.loss == "sop":
-        sop = utils.SOPLoss(X["train"].size(0), num_classes).to(device)
-        sop_opt = optim.SGD(
-            [
-                dict(params=[sop.u], lr=args.sop_lr_u),
-                dict(params=[sop.v], lr=args.sop_lr_v),
-            ]
-        )
-
-    elif args.loss == "elr":
-        elr = utils.ELRLoss(X["train"].size(0), num_classes, args.elr_momentum).to(
-            device
-        )
+    scaler = torch.amp.GradScaler(enabled=args.amp)
 
     if args.wandb:
         run = wandb.init(
@@ -175,10 +201,6 @@ def main(args):
             yhat = torch.cat(yhats)
             return yhat, Y[split]
 
-    evaluator = utils.Evaluator(
-        args.root, pred, net, update_bn_loader=eval_loaders["val"]
-    )
-
     step = 0
     for epoch in tqdm(range(args.num_epochs), leave=False):
         net.train()
@@ -191,23 +213,9 @@ def main(args):
                 if args.loss == "ce":
                     loss = F.cross_entropy(yhat, y)
 
-                elif args.loss == "sop":
-                    loss = sop(i, yhat, y)
-
-                elif args.loss == "elr":
-                    nll = F.cross_entropy(yhat, y)
-                    reg = elr(i, yhat)
-                    loss = nll + args.elr_weight * reg
-
-            if args.loss == "sop":
-                sop_opt.zero_grad(set_to_none=True)
-
             opt.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.step(opt)
-
-            if args.loss == "sop":
-                scaler.step(sop_opt)
 
             scaler.update()
 
@@ -225,31 +233,10 @@ def main(args):
                     step,
                 )
 
-                if args.loss == "sop":
-                    wandb.log(
-                        {
-                            "sop/usq": torch.clamp(
-                                (sop.u**2).max(-1).values, 0, 1
-                            ).mean(),
-                            "sop/vsq": torch.clamp(
-                                (sop.v**2).max(-1).values, 0, 1
-                            ).mean(),
-                        },
-                        step=step,
-                    )
-
         lrs.step()
-
-        evaluator(epoch + 1, net)
-        if args.wandb:
-            wandb.log({k: v[-1] for k, v in evaluator.stage.items()}, step)
-
-    evaluator.finalize()
 
     if args.wandb:
         wandb.finish()
-
-    Path(f"{args.root}/done").touch()
 
 
 if __name__ == "__main__":
@@ -259,7 +246,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, default=root)
-    parser.add_argument("--wandb", type=str, default="2023-08-23")
+    parser.add_argument("--wandb", type=str, default="2024-08-02")
     parser.add_argument("--dataset", type=str, default="cifar10")
     parser.add_argument("--noise", type=str, default="worst")
     parser.add_argument("--eval-batch-size", type=int, default=1_000)
@@ -277,10 +264,6 @@ if __name__ == "__main__":
     parser.add_argument("--num-epochs", type=int, default=100)
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--loss", type=str, default="ce")
-    parser.add_argument("--sop_lr_u", type=float, default=10.0)
-    parser.add_argument("--sop_lr_v", type=float, default=100.0)
-    parser.add_argument("--elr_momentum", type=float, default=0.9)
-    parser.add_argument("--elr_weight", type=float, default=1.0)
 
     args = parser.parse_args()
     main(args)
