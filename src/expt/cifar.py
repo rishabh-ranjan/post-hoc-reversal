@@ -14,6 +14,8 @@ import wandb
 
 from . import utils
 
+wandb.require("core")
+
 
 def x_from_cifar(dataset):
     cls = CIFAR10 if dataset == "cifar10" else CIFAR100
@@ -114,6 +116,21 @@ def main(args):
         split: utils.FastDataLoader([X[split]], args.eval_batch_size, shuffle=False)
         for split in ["val", "test"]
     }
+
+    true_msk = Y["train"] == all_y["clean"][: len(Y["train"])]
+    eval_loaders.update(
+        {
+            "train_true": utils.FastDataLoader(
+                [X["train"][true_msk]], args.eval_batch_size, shuffle=False
+            ),
+            "train_false": utils.FastDataLoader(
+                [X["train"][~true_msk]], args.eval_batch_size, shuffle=False
+            ),
+        }
+    )
+    Y["train_true"] = Y["train"][true_msk]
+    Y["train_false"] = Y["train"][~true_msk]
+    # Y["train_false"] = all_y["clean"][:40_000][~true_msk]
 
     train_loader = utils.FastDataLoader(
         [torch.arange(X["train"].size(0), device=device), X["train"], Y["train"]],

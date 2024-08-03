@@ -6,6 +6,8 @@ import torch
 from tqdm.auto import tqdm
 import wandb
 
+wandb.require("core")
+
 from . import utils
 
 
@@ -23,7 +25,7 @@ def main(args):
     ens_kv.save(args.runs, "runs")
     ens_kv.save(run_kvs[0].load("args"), "args")
 
-    for metric in ["err", "nll"]:
+    for metric in ["err", "nll", "mem"]:
         key = f"{metric}/{args.split}/{args.base}"
         val = torch.stack([kv.load(key) for kv in run_kvs])
         ens_kv.save(val, key)

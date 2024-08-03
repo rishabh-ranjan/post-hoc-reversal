@@ -17,7 +17,7 @@ def evaluate(yhat, y):
     return {
         "err": (yhat.argmax(-1) != y).float().mean(),
         "nll": F.cross_entropy(yhat, y),
-        "mem": F.softmax(yhat, -1).gather(-1, y[None, :]).mean(),
+        "mem": F.softmax(yhat, -1)[torch.arange(y.size(0)), y].mean(),
     }
 
 
@@ -46,7 +46,7 @@ class KeyValStore:
             return self.cache[key]
 
         val = torch.load(
-            f"{self.root}/{key}.pt", weights_only=True, map_location=self.device
+            f"{self.root}/{key}.pt", weights_only=False, map_location=self.device
         )
 
         if cache:
@@ -117,7 +117,7 @@ class Evaluator:
 
         yhats = {}
         ys = {}
-        for split in ["val", "test"]:
+        for split in ["val", "test", "train_true", "train_false"]:
             yhats[f"{split}/base"], ys[split] = self.pred(net, split)
             yhats[f"{split}/base+swa"], _ = self.pred(self.swa, split)
 

@@ -8,6 +8,8 @@ import wandb
 
 from . import utils
 
+wandb.require("core")
+
 
 def main(args):
     print(f"{args=}")
@@ -30,7 +32,7 @@ def main(args):
 
     epochs = kv.load("epochs")
     for epoch_i, epoch in enumerate(tqdm(epochs, "epochs", leave=False)):
-        for split in ["val", "test"]:
+        for split in ["val", "test", "train_true", "train_false"]:
             key = f"yhat/{epoch}/{split}/{args.base}"
             yhat = kv.load(key)
             y = kv.load(f"y/{split}", cache=True)
