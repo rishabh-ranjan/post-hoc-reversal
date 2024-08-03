@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from torch.optim.swa_utils import AveragedModel
-from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 
 
 def generate_data(n_samples=1000, n_features=2, means=None, std=1.0, seed=0):
@@ -80,20 +78,8 @@ def train_model(
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    swa_model = AveragedModel(model)
-
     train_errors = []
     test_errors = []
-    swa_errors = []
-
-    # Define a lambda function for the warmup phase
-    def lr_lambda(epoch):
-        return min(1.0, epoch / warmup_epochs)
-
-    warmup_scheduler = LambdaLR(optimizer, lr_lambda)
-
-    # Define the cosine annealing scheduler
-    scheduler = CosineAnnealingLR(optimizer, T_max=epochs - warmup_epochs)
 
     for epoch in range(epochs):
         outputs = model(X_train)
@@ -103,25 +89,15 @@ def train_model(
         loss.backward()
         optimizer.step()
 
-        swa_model.update_parameters(model)
-
         train_errors.append(test_model(model, X_train, y_train))
         test_errors.append(test_model(model, X_test, y_test))
-        swa_errors.append(test_model(swa_model, X_test, y_test))
 
-        # Update the learning rate
-        if epoch < warmup_epochs:
-            warmup_scheduler.step()
-        else:
-            scheduler.step()
-
-    return train_errors, test_errors, swa_errors
+    return train_errors, test_errors
 
 
-def plot_errors(train_errors, test_errors, swa_errors):
+def plot_errors(train_errors, test_errors):
     # plt.plot(train_errors, label="Train")
     plt.plot(test_errors, label="Test")
-    plt.plot(swa_errors, label="SWA")
     plt.xlabel("Epoch")
     plt.ylabel("Error (%)")
     plt.legend()
@@ -133,12 +109,10 @@ def main():
     X_test, y_test = generate_data(n_samples=10000)
 
     model = MLP(input_size=2, hidden_size=100, num_classes=2)
-    train_errors, test_errors, swa_errors = train_model(
-        model, X_train, y_train, X_test, y_test
-    )
+    train_errors, test_errors = train_model(model, X_train, y_train, X_test, y_test)
 
     visualize_decision_boundary(model, X_train, y_train)
-    plot_errors(train_errors, test_errors, swa_errors)
+    plot_errors(train_errors, test_errors)
 
 
 if __name__ == "__main__":
