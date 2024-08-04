@@ -18,7 +18,7 @@ def generate_data(n_samples, mean1=-1, mean2=1, std_dev=1, seed=3):
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
-        hidden_dim = 64
+        hidden_dim = 100
         self.layers = nn.Sequential(
             nn.Linear(1, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, 2)
         )
@@ -27,14 +27,28 @@ class MLP(nn.Module):
         return self.layers(x)
 
 
+class Ensemble(nn.Module):
+    def __init__(self, models):
+        super(Ensemble, self).__init__()
+        self.models = models
+
+    def forward(self, x):
+        outputs = torch.stack([model(x) for model in self.models], dim=1)
+        return outputs.mean(dim=1)
+
+
 # Training function
 def train(model, criterion, optimizer, data, labels):
+    p = torch.randperm(data.size(0))
+    data = data[p]
+    labels = labels[p]
     model.train()
-    optimizer.zero_grad()
-    outputs = model(data)
-    loss = criterion(outputs, labels)
-    loss.backward()
-    optimizer.step()
+    for data_batch, labels_batch in zip(data.split(1), labels.split(1)):
+        optimizer.zero_grad()
+        outputs = model(data_batch)
+        loss = criterion(outputs, labels_batch)
+        loss.backward()
+        optimizer.step()
     return loss.item()
 
 
@@ -48,10 +62,10 @@ def test(model, criterion, data, labels):
 
 
 # Function to plot errors
-def plot_errors(epochs, train_errors, test_errors):
+def plot_errors(epochs, test_errors):
     plt.figure()  # Create a new figure
-    plt.plot(range(epochs), train_errors, label="Train")
-    plt.plot(range(epochs), test_errors, label="Test")
+    for i in range(len(test_errors)):
+        plt.plot(range(epochs), test_errors[i], label=f"Model {i}")
     plt.xlabel("Epochs")
     plt.ylabel("Error")
     plt.legend()
@@ -85,27 +99,35 @@ def main():
     test_data, test_labels = generate_data(1000)
 
     # Initialize model, criterion and optimizer
-    model = MLP()
+    models = [MLP() for _ in range(2)]
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizers = [optim.Adam(model.parameters()) for model in models]
+
+    ensemble = Ensemble(models)
 
     # Train and test the model
-    epochs = 1000
-    train_errors = []
-    test_errors = []
+    epochs = 100
+    test_errors = [[] for _ in range(len(models) + 1)]
     for epoch in range(epochs):
-        train_error = train(
-            model, criterion, optimizer, train_data.view(-1, 1), train_labels
-        )
-        test_error = test(model, criterion, test_data.view(-1, 1), test_labels)
-        train_errors.append(train_error)
-        test_errors.append(test_error)
+        for i, (model, optimizer) in enumerate(zip(models, optimizers)):
+            train(model, criterion, optimizer, train_data.view(-1, 1), train_labels)
+            test_error = test(model, criterion, test_data.view(-1, 1), test_labels)
+            test_errors[i].append(test_error)
+        test_error = test(ensemble, criterion, test_data.view(-1, 1), test_labels)
+        test_errors[-1].append(test_error)
+
+        if epoch % 10 == 0:
+            # Plot predicted probabilities and training points
+            for model in models:
+                plot_probabilities_and_points(model, train_data, train_labels)
+            print("---")
 
     # Plot training and test errors
-    plot_errors(epochs, train_errors, test_errors)
+    plot_errors(epochs, test_errors)
 
     # Plot predicted probabilities and training points
-    plot_probabilities_and_points(model, train_data, train_labels)
+    for model in models:
+        plot_probabilities_and_points(model, train_data, train_labels)
 
 
 if __name__ == "__main__":
