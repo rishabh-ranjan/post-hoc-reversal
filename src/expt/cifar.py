@@ -187,6 +187,7 @@ def main(args):
         with torch.no_grad():
             yhats = []
             for (x,) in eval_loaders[split]:
+                x = transform(x)
                 yhat = net(x)
                 yhats.append(yhat)
             yhat = torch.cat(yhats)

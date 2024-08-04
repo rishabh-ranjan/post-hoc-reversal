@@ -22,37 +22,37 @@ from torch.utils.data import DataLoader, TensorDataset
 #     )
 
 
-# def generate_data(n_samples=1000, noise=0.9, random_state=42):
-#     np.random.seed(random_state)
+def generate_data(n_samples=1000, noise=0.9, random_state=42):
+    np.random.seed(random_state)
 
-#     n = np.sqrt(np.random.rand(n_samples // 2)) * 780 * (2 * np.pi) / 360
-#     d1x = -np.cos(n) * n + np.random.rand(n_samples // 2) * noise
-#     d1y = np.sin(n) * n + np.random.rand(n_samples // 2) * noise
-#     X = np.vstack((np.column_stack((d1x, d1y)), np.column_stack((-d1x, -d1y))))
-#     y = np.hstack((np.zeros(n_samples // 2), np.ones(n_samples // 2)))
+    n = np.sqrt(np.random.rand(n_samples // 2)) * 780 * (2 * np.pi) / 360
+    d1x = -np.cos(n) * n + np.random.rand(n_samples // 2) * noise
+    d1y = np.sin(n) * n + np.random.rand(n_samples // 2) * noise
+    X = np.vstack((np.column_stack((d1x, d1y)), np.column_stack((-d1x, -d1y))))
+    y = np.hstack((np.zeros(n_samples // 2), np.ones(n_samples // 2)))
 
-#     return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
+    return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
 
 
-def generate_data(n_samples=1000, noise=2.5, seed=0):
-    generator = torch.Generator().manual_seed(seed)
+# def generate_data(n_samples=1000, noise=2.5, seed=0):
+#     generator = torch.Generator().manual_seed(seed)
 
-    half_samples = n_samples // 4
-    X1 = 1 + noise * (torch.rand(half_samples, 2, generator=generator) - 0.5)
-    X2 = -1 + noise * (torch.rand(half_samples, 2, generator=generator) - 0.5)
-    X3 = torch.tensor([-1.0, 1.0]) + noise * (
-        torch.rand(half_samples, 2, generator=generator) - 0.5
-    )
-    X4 = torch.tensor([1.0, -1.0]) + noise * (
-        torch.rand(half_samples, 2, generator=generator) - 0.5
-    )
-    X = torch.cat((X1, X2, X3, X4))
+#     half_samples = n_samples // 4
+#     X1 = 1 + noise * (torch.rand(half_samples, 2, generator=generator) - 0.5)
+#     X2 = -1 + noise * (torch.rand(half_samples, 2, generator=generator) - 0.5)
+#     X3 = torch.tensor([-1.0, 1.0]) + noise * (
+#         torch.rand(half_samples, 2, generator=generator) - 0.5
+#     )
+#     X4 = torch.tensor([1.0, -1.0]) + noise * (
+#         torch.rand(half_samples, 2, generator=generator) - 0.5
+#     )
+#     X = torch.cat((X1, X2, X3, X4))
 
-    y1 = torch.ones(2 * half_samples, dtype=torch.long)
-    y2 = torch.zeros(2 * half_samples, dtype=torch.long)
-    y = torch.cat((y1, y2))
+#     y1 = torch.ones(2 * half_samples, dtype=torch.long)
+#     y2 = torch.zeros(2 * half_samples, dtype=torch.long)
+#     y = torch.cat((y1, y2))
 
-    return X, y
+#     return X, y
 
 
 # def generate_data(n_samples=1000, means=None, cov=None, seed=0):
