@@ -9,7 +9,7 @@ import wandb
 wandb.require("core")
 
 
-def viz(net, x, y, x_min=-5, steps=100):
+def viz(net, x, y, steps=100):
     plt.figure()
     x_min = x[:, 0].min()
     x_max = x[:, 0].max()
