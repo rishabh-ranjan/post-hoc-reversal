@@ -29,7 +29,7 @@ def viz(net, x, y, steps=100):
     plt.show()
 
 
-def spiral(n_samples=2000, noise=0.5, random_state=42):
+def spiral(n_samples, noise=0.5, random_state=42):
     np.random.seed(random_state)
 
     n = np.sqrt(np.random.rand(n_samples // 2)) * 720 * (2 * np.pi) / 360
@@ -59,6 +59,19 @@ class MLP(nn.Module):
             x = F.relu(x)
         x = self.fc2(x)
         return x
+
+
+class Ens(nn.Module):
+    def __init__(self, nets):
+        super().__init__()
+        self.nets = nn.ModuleList(nets)
+
+    def forward(self, x):
+        outs = []
+        for net in self.nets:
+            out = net(x)
+            outs.append(out)
+        return torch.stack(outs).mean(0)
 
 
 def get_data():
@@ -123,7 +136,8 @@ def main():
         # for lrs in lrss:
         #     lrs.step()
 
-        if epoch % 10 == 9:
+        # if epoch % 20 == 19:
+        if True:
             with torch.no_grad():
                 errs = []
                 logits = []
@@ -142,8 +156,12 @@ def main():
                 err = (pred != yt).float().mean()
                 wandb.log({"err_ens": err}, step=epoch)
 
-    viz(net, x, y)
-    wandb.log({"viz": wandb.Image(plt)})
+        if epoch in [439, 999]:
+            for i in range(4):
+                viz(nets[i], xs[i], ys[i])
+                wandb.log({f"viz_{i}": wandb.Image(plt)}, step=epoch)
+            viz(Ens(nets), x, y)
+            wandb.log({"viz_ens": wandb.Image(plt)}, step=epoch)
 
 
 if __name__ == "__main__":
