@@ -12,12 +12,32 @@ IMAGENET_STD = [0.229, 0.224, 0.225]
 CIFAR_MEAN = [0.4914, 0.4822, 0.4465]
 CIFAR_STD = [0.2023, 0.1994, 0.2010]
 
+old_preds = defaultdict(lambda: None)
+
+
+def flip_frac(yhat):
+    """Fraction of examples whose prediction changes
+    compared to the last epoch"""
+    global old_preds
+
+    pred = yhat.argmax(-1)
+    sz = pred.size(0)
+
+    if old_preds[sz] is None:
+        old_preds[sz] = pred
+        return float("nan")
+    else:
+        frac = (pred != old_preds[sz]).float().mean()
+        old_preds[sz] = pred
+        return frac
+
 
 def evaluate(yhat, y):
     return {
         "err": (yhat.argmax(-1) != y).float().mean(),
         "nll": F.cross_entropy(yhat, y),
         "mem": F.softmax(yhat, -1)[torch.arange(y.size(0)), y].mean(),
+        "osc": flip_frac(yhat),
     }
 
 
