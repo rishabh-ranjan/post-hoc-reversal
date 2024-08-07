@@ -15,13 +15,16 @@ CIFAR_STD = [0.2023, 0.1994, 0.2010]
 old_preds = defaultdict(lambda: None)
 
 
-def flip_frac(yhat):
+def flip_frac(yhat, split=None, name=None):
     """Fraction of examples whose prediction changes
     compared to the last epoch"""
     global old_preds
 
+    if split is None or name is None:
+        return float("nan")
+
     pred = yhat.argmax(-1)
-    sz = pred.size(0)
+    sz = (split, name)
 
     if old_preds[sz] is None:
         old_preds[sz] = pred
@@ -32,12 +35,12 @@ def flip_frac(yhat):
         return frac
 
 
-def evaluate(yhat, y):
+def evaluate(yhat, y, split=None, name=None):
     return {
         "err": (yhat.argmax(-1) != y).float().mean(),
         "nll": F.cross_entropy(yhat, y),
         "mem": F.softmax(yhat, -1)[torch.arange(y.size(0)), y].mean(),
-        "osc": flip_frac(yhat),
+        "osc": flip_frac(yhat, split, name),
     }
 
 
@@ -148,7 +151,7 @@ class Evaluator:
                 yhat = yhats[f"{split}/{name}"]
                 self.kv.save(yhat, f"yhat/{epochs}/{split}/{name}")
 
-                for metric, val in evaluate(yhat, ys[split]).items():
+                for metric, val in evaluate(yhat, ys[split], split, name).items():
                     self.stage[f"{metric}/{split}/{name}"].append(val)
 
     def finalize(self):
