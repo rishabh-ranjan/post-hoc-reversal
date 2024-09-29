@@ -25,7 +25,7 @@ def main(args):
     ens_kv.save(args.runs, "runs")
     ens_kv.save(run_kvs[0].load("args"), "args")
 
-    for metric in ["err", "nll", "mem", "osc"]:
+    for metric in ["err", "nll", "mem", "osc", "temp"]:
         key = f"{metric}/{args.split}/{args.base}"
         val = torch.stack([kv.load(key) for kv in run_kvs])
         ens_kv.save(val, key)

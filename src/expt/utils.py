@@ -5,6 +5,7 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 from torch.optim.swa_utils import AveragedModel
+import torchcal
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -35,12 +36,19 @@ def flip_frac(yhat, split=None, name=None):
         return frac
 
 
+def temperature(yhat, y):
+    cal = torchcal.calibrator("temp_scaler", device="cuda")
+    cal.fit(yhat, y)
+    return cal.temp.item()
+
+
 def evaluate(yhat, y, split=None, name=None):
     return {
         "err": (yhat.argmax(-1) != y).float().mean(),
         "nll": F.cross_entropy(yhat, y),
         "mem": F.softmax(yhat, -1)[torch.arange(y.size(0)), y].mean(),
         "osc": flip_frac(yhat, split, name),
+        "temp": temperature(yhat, y),
     }
 
 
